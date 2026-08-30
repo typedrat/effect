@@ -7124,11 +7124,17 @@ effect/unstable/rpc/Utils (barrel: effect/unstable/rpc)
 
 ### `@effect/platform/HttpServer`
 
+- `HttpServer.Address` -> `effect/unstable/net/Net#SocketAddress`: Replaced by the shared concrete internet-or-Unix socket address union.
+
 - `HttpServer.HttpServer` -> `HttpServer.HttpServer`: The interface and tag became one Context.Service class; use its Service member for implementations.
 
 - `HttpServer.ServeOptions` -> `none`: The unused respond option model was removed with no shared v4 counterpart.
 
+- `HttpServer.TcpAddress` -> `effect/unstable/net/Net#InetAddress`: Replaced by the shared resolved internet-address model; use address and port instead of hostname and port.
+
 - `HttpServer.TypeId` -> `none`: The public TypeId was removed; HttpServer is now a Context.Service class.
+
+- `HttpServer.UnixAddress` -> `effect/unstable/net/Net#UnixPathAddress`: Replaced by the shared Unix filesystem-path address model.
 
 - `HttpServer.addressWith` -> `HttpServer.HttpServer.use(({ address }) => effect(address))`: The accessor was removed; read the service and pass its Address to the callback.
 
@@ -7390,7 +7396,13 @@ effect/unstable/rpc/Utils (barrel: effect/unstable/rpc)
 
 ### `@effect/platform/SocketServer`
 
+- `SocketServer.Address` -> `effect/unstable/net/Net#SocketAddress`: Replaced by the shared concrete internet-or-Unix socket address union.
+
 - `SocketServer.ErrorTypeId` -> `SocketServer.ErrorTypeId`: The API moved to effect/unstable/socket/SocketServer and retains this name.
+
+- `SocketServer.TcpAddress` -> `effect/unstable/net/Net#InetAddress`: Replaced by the shared resolved internet-address model; use address and port instead of hostname and port.
+
+- `SocketServer.UnixAddress` -> `effect/unstable/net/Net#UnixPathAddress`: Replaced by the shared Unix filesystem-path address model.
 
 ### `@effect/platform/Template`
 
