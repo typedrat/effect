@@ -12057,7 +12057,7 @@ export interface Duration extends declare<Duration_.Duration> {
 
 const netAddressFromString = <A>(
   declaration: declare<A>,
-  parse: (input: string) => Result_.Result<A, InternalNetAddress.NetAddressIssue>,
+  parse: (input: string) => Result_.Result<A, InternalNetAddress.NetAddressError>,
   encode: (value: A) => string
 ) =>
   String.pipe(decodeTo(
