@@ -1,5 +1,51 @@
 # @effect/platform-node
 
+## 4.0.0-rc.113
+
+### Patch Changes
+
+- [#7463](https://github.com/Effect-TS/effect/pull/7463) [`0d083ba`](https://github.com/Effect-TS/effect/commit/0d083ba26b2e1afec8d3e8d83db0d05683b6602b) Thanks @tim-smart! - Remove the `mime` runtime dependency. The new `effect/unstable/http/Mime` module provides top-level lookup functions
+  backed by a vendored standard MIME registry.
+
+- [#7477](https://github.com/Effect-TS/effect/pull/7477) [`be0f822`](https://github.com/Effect-TS/effect/commit/be0f8221e37abd52668567b60fc1be28e3ff3803) Thanks @candrewlee14! - Allow sockets to use browser, Bun, and Node WebSocket implementations without consumer casts. Platform constructors
+  now support typed opening-handshake headers where available.
+
+- [#7511](https://github.com/Effect-TS/effect/pull/7511) [`a4bb2aa`](https://github.com/Effect-TS/effect/commit/a4bb2aa22698ea8a98d5172d81305f4f74bd7caa) Thanks @tim-smart! - Add `NodeSocket.makeTls`, `NodeSocket.makeTlsChannel`, and `NodeSocket.layerTls` for TLS client connections.
+  
+  These mirror the existing `makeNet` family but dial `tls.connect`, so they take the full `tls.ConnectionOptions` set:
+  trust anchors (`ca`), client certificates (`cert` / `key`), ALPN protocols, and `servername`. The socket opens once the
+  handshake completes; a failed handshake fails with a `SocketOpenError`.
+
+- [#6324](https://github.com/Effect-TS/effect/pull/6324) [`a29eb70`](https://github.com/Effect-TS/effect/commit/a29eb702ffe3fc58bd28c4d7857298cd65d73668) Thanks @tim-smart! - Add `NodeSocketServer.makeTls` and `NodeSocketServer.layerTls` for TLS socket servers.
+
+- [#6324](https://github.com/Effect-TS/effect/pull/6324) [`a29eb70`](https://github.com/Effect-TS/effect/commit/a29eb702ffe3fc58bd28c4d7857298cd65d73668) Thanks @tim-smart! - Add Socket.upgrade, for upgrading tcp sockets using STARTTLS
+
+- [#7487](https://github.com/Effect-TS/effect/pull/7487) [`ba53b64`](https://github.com/Effect-TS/effect/commit/ba53b646e9dad9b39fd6cf5b2d89de9bf858bb80) Thanks @tim-smart! - Redesign `Socket` around a scoped, pull-based reader with transport backpressure.
+  
+  `Socket` now exposes `reader` and `writer`. Client reader acquisition dials and yields a pull of non-empty batches: one buffer for TCP and one entry per WebSocket frame. TCP applies backpressure while paused; pausable WebSockets pause at `highWaterMark` (64 KiB by default) and resume after draining. Browser WebSockets cannot pause, so they can fail with `SocketReadError` at a configured `highWaterMark`. Writes await native drain signals and batch with `cork` / `uncork` where available.
+  
+  ### Breaking changes
+  
+  - `Socket.run`, `Socket.runString`, and `Socket.runRaw` are removed. Acquire `socket.reader` (or `Socket.readerBytes` / `Socket.readerString`) in a scope and pull in a loop. Code before the first pull replaces `onOpen`.
+  - `Socket.make` now takes `{ reader, writer }`. The writer acquisition is infallible and yields a `Writer` with `write` and `writeAll`; both operations can still fail with `SocketError`.
+  - Every close fails the pull with `SocketError` wrapping `SocketCloseError`. The close-code predicates are removed; use `Effect.retry` around the scoped read loop to reconnect.
+  - `Socket.toChannel` and `Socket.toChannelString` now read from the pull and fail on close. `Socket.toStream` is added for read-only consumption.
+  - `fromWebSocket` drops the `onInitialRun` option; `SendQueueCapacity` is removed.
+  - Accepted server sockets pause immediately. Their reader attaches to the existing connection and cannot reconnect after close.
+
+- [#7461](https://github.com/Effect-TS/effect/pull/7461) [`b4d5398`](https://github.com/Effect-TS/effect/commit/b4d5398598c04a84054a55873c943d587880058d) Thanks @tim-smart! - Remove the MessagePack encoding and RPC serialization APIs together with the `msgpackr` dependency. Event-log persistence and remote messages now use SchemaBinary, and cluster transports use SchemaBinary unless NDJSON is selected explicitly.
+
+- [#7427](https://github.com/Effect-TS/effect/pull/7427) [`1a2ccee`](https://github.com/Effect-TS/effect/commit/1a2ccee2bbb93514dc66e0a9cdeb52a82172ab0e) Thanks @tim-smart! - Use SchemaBinary as the default RPC serialization for TCP cluster connections, including configurable frame limits.
+  
+  Cluster payloads are encoded with the binary codec on the wire. When a persisted reply cannot be encoded for JSON storage, the defect fallback that storage records is now also the reply delivered to waiting callers, so live replies always match what was persisted.
+  
+  SchemaBinary codecs are memoized by schema identity and wire mode, so per-message codec requests reuse the derived codec instead of rebuilding it.
+
+- [#7459](https://github.com/Effect-TS/effect/pull/7459) [`505dc05`](https://github.com/Effect-TS/effect/commit/505dc05dd68a80694f30bfaf772699494726f54d) Thanks @tim-smart! - Prevent NodeHttpServer from writing the route's HTTP response onto a connection that was upgraded to a WebSocket connection because stricter clients will interpret those bytes as WebSocket frames, logging "Invalid frame header" and failing the connection with an untyped 1006 error instead of the actual close code that the server sent.
+- Updated dependencies [[`b945ded`](https://github.com/Effect-TS/effect/commit/b945ded23aa9a0ad88bb55aa4089680866dccf92), [`0d083ba`](https://github.com/Effect-TS/effect/commit/0d083ba26b2e1afec8d3e8d83db0d05683b6602b), [`be0f822`](https://github.com/Effect-TS/effect/commit/be0f8221e37abd52668567b60fc1be28e3ff3803), [`a63dcbf`](https://github.com/Effect-TS/effect/commit/a63dcbf04e5c3d8d934a41bc6122e9951b1cefa9), [`115d8c2`](https://github.com/Effect-TS/effect/commit/115d8c22599640ece2fd6a10564925b1d79f8a8c), [`dd99ab0`](https://github.com/Effect-TS/effect/commit/dd99ab007e3352761187dae330d52f65feeff7c0), [`d7ae6b6`](https://github.com/Effect-TS/effect/commit/d7ae6b6491a88f2710612bfcddaf608ebe925f7c), [`534b8b9`](https://github.com/Effect-TS/effect/commit/534b8b9dba195ec38a4795fe564d5e0876cb6468), [`a4bb2aa`](https://github.com/Effect-TS/effect/commit/a4bb2aa22698ea8a98d5172d81305f4f74bd7caa), [`a29eb70`](https://github.com/Effect-TS/effect/commit/a29eb702ffe3fc58bd28c4d7857298cd65d73668), [`a29eb70`](https://github.com/Effect-TS/effect/commit/a29eb702ffe3fc58bd28c4d7857298cd65d73668), [`b76a1cf`](https://github.com/Effect-TS/effect/commit/b76a1cf32b0a742c24c1874137e2da8fed5c48eb), [`53843f6`](https://github.com/Effect-TS/effect/commit/53843f6490f4eebaf1eeb91fdcc5f1c542b0e132), [`8d1e97a`](https://github.com/Effect-TS/effect/commit/8d1e97adbf5a36b4b53ab56f797c2ec0267a8821), [`84864bc`](https://github.com/Effect-TS/effect/commit/84864bc30c9e92a1226f65bb78b0641a7e0acea2), [`6e3ae7b`](https://github.com/Effect-TS/effect/commit/6e3ae7b6359bda08cea74b761fd54224d7af45e2), [`145d8e1`](https://github.com/Effect-TS/effect/commit/145d8e1013220425b8edf34f7011c73f73e1cdcf), [`fa6a56b`](https://github.com/Effect-TS/effect/commit/fa6a56b862229cfb699e076bac50e3b737ae3c72), [`d60c5d4`](https://github.com/Effect-TS/effect/commit/d60c5d40b5954ea1557aef1502b4b87f98bbf134), [`9b517ad`](https://github.com/Effect-TS/effect/commit/9b517ad28a0c2f213693bcab408658c40e3b6d9b), [`186dd49`](https://github.com/Effect-TS/effect/commit/186dd4914084fa346a870ce9c637b9c2a6cc8100), [`ba53b64`](https://github.com/Effect-TS/effect/commit/ba53b646e9dad9b39fd6cf5b2d89de9bf858bb80), [`62d82f4`](https://github.com/Effect-TS/effect/commit/62d82f4919c72d8cc0cfd2b704ed6900f69ad9a8), [`97dd022`](https://github.com/Effect-TS/effect/commit/97dd022fe7fbd1696dd60f3319eae594abdd3760), [`a29e05a`](https://github.com/Effect-TS/effect/commit/a29e05a907053a8617763b4e7408e1f012b59049), [`b4d5398`](https://github.com/Effect-TS/effect/commit/b4d5398598c04a84054a55873c943d587880058d), [`5641ad3`](https://github.com/Effect-TS/effect/commit/5641ad333a88bb9e56baf886006682678391be0a), [`fa6a56b`](https://github.com/Effect-TS/effect/commit/fa6a56b862229cfb699e076bac50e3b737ae3c72), [`11c5ee7`](https://github.com/Effect-TS/effect/commit/11c5ee7202acd3bb789d0a8ce78e6c4523071553), [`1742d2f`](https://github.com/Effect-TS/effect/commit/1742d2f48441cb7b1a8d9aca3a8e6f0acbc35a96), [`9642776`](https://github.com/Effect-TS/effect/commit/964277661423f398f777ec2eab4b3ecc0b53f53b), [`1a2ccee`](https://github.com/Effect-TS/effect/commit/1a2ccee2bbb93514dc66e0a9cdeb52a82172ab0e), [`7704034`](https://github.com/Effect-TS/effect/commit/770403411bcd8befef0552a0e40066abc417f6ea), [`e72b12f`](https://github.com/Effect-TS/effect/commit/e72b12fc305710550bc6dcb978e92de8abff88cd), [`310dd9c`](https://github.com/Effect-TS/effect/commit/310dd9ce9681e97f558bb042adb35f6040ab81e3), [`81485ef`](https://github.com/Effect-TS/effect/commit/81485ef0288a3321e75d7d4ae32b7e0e06b6f86b)]:
+  - effect@4.0.0-rc.113
+  - @effect/platform-node-shared@4.0.0-rc.113
+
 ## 4.0.0-rc.112
 
 ### Patch Changes
