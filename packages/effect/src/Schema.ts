@@ -68,6 +68,7 @@ import type { Assign, Lambda, Mutable, Simplify } from "./Struct.ts"
 import * as Struct_ from "./Struct.ts"
 import type { RequiredKeys, UnionToIntersection } from "./Types.ts"
 import type { Unify } from "./Unify.ts"
+import * as IpInterface_ from "./unstable/net/IpInterface.ts"
 import * as IpNetwork_ from "./unstable/net/IpNetwork.ts"
 import * as NetAddress_ from "./unstable/net/NetAddress.ts"
 
@@ -12164,6 +12165,75 @@ export const IpAddressFromString = netAddressFromString(
   NetAddress_.ipFromString,
   NetAddress_.formatIp,
   "IpAddressFromString"
+)
+
+/**
+ * Schema for already-constructed IPv4 interface address values.
+ *
+ * @category schemas
+ * @since 4.0.0
+ */
+export const Ipv4Interface: declare<IpInterface_.Ipv4Interface> = declare(IpInterface_.isIpv4Interface, {
+  identifier: "Ipv4Interface"
+})
+
+/**
+ * Schema for IPv4 interface addresses encoded as an address and prefix length.
+ *
+ * @category schemas
+ * @since 4.0.0
+ */
+export const Ipv4InterfaceFromString = netAddressFromString(
+  Ipv4Interface,
+  IpInterface_.ipv4FromString,
+  IpInterface_.format,
+  "Ipv4InterfaceFromString"
+)
+
+/**
+ * Schema for already-constructed IPv6 interface address values.
+ *
+ * @category schemas
+ * @since 4.0.0
+ */
+export const Ipv6Interface: declare<IpInterface_.Ipv6Interface> = declare(IpInterface_.isIpv6Interface, {
+  identifier: "Ipv6Interface"
+})
+
+/**
+ * Schema for IPv6 interface addresses encoded as an address and prefix length.
+ *
+ * @category schemas
+ * @since 4.0.0
+ */
+export const Ipv6InterfaceFromString = netAddressFromString(
+  Ipv6Interface,
+  IpInterface_.ipv6FromString,
+  IpInterface_.format,
+  "Ipv6InterfaceFromString"
+)
+
+/**
+ * Schema for already-constructed IPv4 or IPv6 interface address values.
+ *
+ * @category schemas
+ * @since 4.0.0
+ */
+export const IpInterface: declare<IpInterface_.IpInterface> = declare(IpInterface_.isIpInterface, {
+  identifier: "IpInterface"
+})
+
+/**
+ * Schema for IPv4 or IPv6 interface addresses encoded as an address and prefix length.
+ *
+ * @category schemas
+ * @since 4.0.0
+ */
+export const IpInterfaceFromString = netAddressFromString(
+  IpInterface,
+  IpInterface_.fromString,
+  IpInterface_.format,
+  "IpInterfaceFromString"
 )
 
 /**

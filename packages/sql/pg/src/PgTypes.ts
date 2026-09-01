@@ -18,6 +18,7 @@
  */
 import * as Data from "effect/Data"
 import * as Result from "effect/Result"
+import * as IpInterface from "effect/unstable/net/IpInterface"
 import * as IpNetwork from "effect/unstable/net/IpNetwork"
 import * as NetAddress from "effect/unstable/net/NetAddress"
 import type * as PgProtocol from "./PgProtocol.ts"
@@ -659,20 +660,10 @@ const PGSQL_AF_INET6 = 3
 
 const encodeInet = (value: unknown, isCidr: boolean): Uint8Array => {
   const text = requireString(value, isCidr ? "cidr" : "inet")
-  const slash = text.indexOf("/")
-  if (slash !== text.lastIndexOf("/")) return fail(`Invalid network address "${text}"`)
-  const addressText = slash === -1 ? text : text.slice(0, slash)
-  const parsedAddress = NetAddress.ipFromString(addressText)
-  if (Result.isFailure(parsedAddress)) return fail(parsedAddress.failure.message)
-  const address = parsedAddress.success
-  const fullBits = NetAddress.isIpv4Address(address) ? 32 : 128
-  let bits = fullBits
-  if (slash !== -1) {
-    const prefix = text.slice(slash + 1)
-    if (!/^(0|[1-9]\d*)$/.test(prefix)) return fail(`Invalid netmask length in "${text}"`)
-    bits = Number(prefix)
-    if (bits > fullBits) return fail(`Invalid netmask length in "${text}"`)
-  }
+  const parsed = IpInterface.fromString(text)
+  if (Result.isFailure(parsed)) return fail(parsed.failure.message)
+  const address = parsed.success.address
+  const bits = parsed.success.prefixLength
   if (isCidr) {
     const network = IpNetwork.make(address, bits)
     if (Result.isFailure(network)) return fail(network.failure.message)
@@ -707,13 +698,15 @@ const decodeInet = (bytes: Uint8Array, offset: number, size: number): string => 
   const address = family === PGSQL_AF_INET
     ? NetAddress.ipv4FromBytesUnsafe(addressBytes)
     : NetAddress.ipv6FromBytesUnsafe(addressBytes)
+  const interfaceAddress = IpInterface.make(address, bits)
+  if (Result.isFailure(interfaceAddress)) return fail(interfaceAddress.failure.message)
   if (isCidr) {
-    const network = IpNetwork.make(address, bits)
+    const network = IpNetwork.make(interfaceAddress.success.address, interfaceAddress.success.prefixLength)
     if (Result.isFailure(network)) return fail(network.failure.message)
     return IpNetwork.format(network.success)
   }
-  const text = NetAddress.formatIp(address)
-  return bits !== addressSize * 8 ? `${text}/${bits}` : text
+  const text = IpInterface.format(interfaceAddress.success)
+  return bits === addressSize * 8 ? text.slice(0, text.lastIndexOf("/")) : text
 }
 
 // -----------------------------------------------------------------------------

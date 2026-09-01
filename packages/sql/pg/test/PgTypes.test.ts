@@ -301,6 +301,12 @@ describe("PgTypes", () => {
     assertThrowsTagged("PgTypesCodecError", () => PgTypes.encode("010.1.2.3", PgTypes.OID.inet))
   })
 
+  it("preserves inet host bits alongside the prefix", () => {
+    for (const value of ["10.1.2.3/8", "2001:db8::1/32"]) {
+      assert.strictEqual(PgTypes.decode(PgTypes.encode(value, PgTypes.OID.inet), PgTypes.OID.inet, 1), value)
+    }
+  })
+
   describe("errors", () => {
     it("rejects the text format", () => {
       assertThrowsTagged("PgTypesCodecError", () => PgTypes.decode(bytes("31"), PgTypes.OID.int4, 0))
