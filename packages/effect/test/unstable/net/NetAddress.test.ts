@@ -238,6 +238,32 @@ describe("NetAddress", () => {
   })
 
   describe("socket addresses", () => {
+    it("constructs socket addresses from input", () => {
+      const inet = NetAddress.inetAddressFromStringUnsafe("127.0.0.1:8080")
+      assert.strictEqual(success(NetAddress.socketAddressFromInput(inet)), inet)
+      assert.strictEqual(
+        NetAddress.formatSocketAddress(success(NetAddress.socketAddressFromInput({
+          address: "::1",
+          port: 8080
+        }))),
+        "[::1]:8080"
+      )
+      assert.strictEqual(
+        NetAddress.formatSocketAddress(success(NetAddress.socketAddressFromInput({
+          address: NetAddress.ipv4Loopback,
+          port: 8080
+        }))),
+        "127.0.0.1:8080"
+      )
+      assert.strictEqual(
+        NetAddress.formatSocketAddress(success(NetAddress.socketAddressFromInput({ path: "server.sock" }))),
+        "server.sock"
+      )
+      failure(NetAddress.socketAddressFromInput({ address: "localhost", port: 8080 }))
+      failure(NetAddress.socketAddressFromInput({ address: "127.0.0.1", port: 65536 }))
+      assert.throws(() => NetAddress.socketAddressFromInputUnsafe({ address: "localhost", port: 8080 }))
+    })
+
     it("parses and formats bracketed numeric addresses", () => {
       assert.strictEqual(
         NetAddress.formatInet(success(NetAddress.inetAddressFromString("127.0.0.1:8080"))),

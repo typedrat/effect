@@ -1,4 +1,5 @@
-import { type Result, Schema } from "effect"
+import { Effect, type Result, Schema } from "effect"
+import * as HttpServer from "effect/unstable/http/HttpServer"
 import * as NetAddress from "effect/unstable/net/NetAddress"
 import { describe, expect, it } from "tstyche"
 
@@ -12,7 +13,19 @@ describe("NetAddress", () => {
     expect(NetAddress.ipFromStringUnsafe("::1")).type.toBe<NetAddress.IpAddress>()
     expect(NetAddress.inetAddressUnsafe(NetAddress.ipv6Loopback, 80)).type.toBe<NetAddress.InetAddress>()
     expect(NetAddress.inetAddressFromStringUnsafe("[::1]:80")).type.toBe<NetAddress.InetAddress>()
+    expect(NetAddress.socketAddressFromInput({ address: "::1", port: 80 })).type.toBe<
+      Result.Result<NetAddress.SocketAddress, NetAddress.NetAddressError>
+    >()
+    expect(NetAddress.socketAddressFromInputUnsafe({ path: "server.sock" })).type.toBe<NetAddress.SocketAddress>()
     expect(NetAddress.ipv4Loopback.bytes).type.toBe<Uint8Array>()
+  })
+
+  it("normalizes socket address input at consumer constructors", () => {
+    const server = HttpServer.make({
+      address: { address: "127.0.0.1", port: 8080 },
+      serve: () => Effect.void
+    })
+    expect(server.address).type.toBe<NetAddress.SocketAddress>()
   })
 
   it("narrows address unions", () => {

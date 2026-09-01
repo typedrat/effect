@@ -121,6 +121,29 @@ export interface UnixPathAddress extends Equal.Equal, Hash.Hash {
 export type SocketAddress = InetAddress | UnixPathAddress
 
 /**
+ * Companion types for constructing socket addresses.
+ *
+ * @since 4.0.0
+ */
+export declare namespace SocketAddress {
+  /**
+   * Input that can be converted to a concrete `SocketAddress` without hostname
+   * resolution.
+   *
+   * **Details**
+   *
+   * String addresses must be numeric IPv4 or IPv6 literals.
+   *
+   * @category models
+   * @since 4.0.0
+   */
+  export type Input =
+    | SocketAddress
+    | { readonly address: IpAddress | string; readonly port: number }
+    | { readonly path: string }
+}
+
+/**
  * A checked network-address operation failure.
  *
  * @category errors
@@ -128,7 +151,14 @@ export type SocketAddress = InetAddress | UnixPathAddress
  */
 export class NetAddressError extends Data.TaggedError("NetAddressError")<{
   readonly input: unknown
-  readonly kind: "Ipv4Address" | "Ipv6Address" | "IpAddress" | "MacAddress" | "InetAddress" | "Port"
+  readonly kind:
+    | "Ipv4Address"
+    | "Ipv6Address"
+    | "IpAddress"
+    | "MacAddress"
+    | "InetAddress"
+    | "SocketAddress"
+    | "Port"
   readonly reason: string
 }> {
   override get message(): string {
@@ -1080,6 +1110,47 @@ export const unixPathAddress = (path: string): UnixPathAddress => {
   self.path = path
   return Object.freeze(self)
 }
+
+/**
+ * Converts a `SocketAddress.Input` to a concrete socket address.
+ *
+ * **Details**
+ *
+ * Numeric IP strings are parsed without hostname resolution. Invalid IP
+ * literals, ports, and input shapes return a `NetAddressError`.
+ *
+ * @category constructors
+ * @since 4.0.0
+ */
+export const socketAddressFromInput = (
+  input: SocketAddress.Input
+): Result.Result<SocketAddress, NetAddressError> => {
+  if (isSocketAddress(input)) return Result.succeed(input)
+  if (hasProperty(input, "path")) {
+    return typeof input.path === "string"
+      ? Result.succeed(unixPathAddress(input.path))
+      : addressError("SocketAddress", input, "path must be a string")
+  }
+  if (!hasProperty(input, "address") || !hasProperty(input, "port")) {
+    return addressError("SocketAddress", input, "expected an address and port or a Unix path")
+  }
+  const address = typeof input.address === "string"
+    ? ipFromString(input.address)
+    : isIpAddress(input.address)
+    ? Result.succeed(input.address)
+    : addressError("SocketAddress", input, "address must be an IP address or numeric IP string")
+  return Result.isFailure(address) ? Result.fail(address.failure) : inetAddress(address.success, input.port as number)
+}
+
+/**
+ * Converts a trusted `SocketAddress.Input` to a concrete socket address,
+ * throwing on failure.
+ *
+ * @category unsafe
+ * @since 4.0.0
+ */
+export const socketAddressFromInputUnsafe = (input: SocketAddress.Input): SocketAddress =>
+  Result.getOrThrow(socketAddressFromInput(input))
 
 /**
  * Formats a portable socket address for human-readable output.

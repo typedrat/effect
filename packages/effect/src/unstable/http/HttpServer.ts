@@ -69,9 +69,12 @@ export const make = (
       httpEffect: Effect.Effect<HttpServerResponse, unknown, HttpServerRequest | Scope.Scope>,
       middleware?: Middleware.HttpMiddleware
     ) => Effect.Effect<void, never, Scope.Scope>
-    readonly address: NetAddress.SocketAddress
+    readonly address: NetAddress.SocketAddress.Input
   }
-): HttpServer["Service"] => options
+): HttpServer["Service"] => ({
+  ...options,
+  address: NetAddress.socketAddressFromInputUnsafe(options.address)
+})
 
 /**
  * Creates a layer that starts serving an HTTP response effect with the current
