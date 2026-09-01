@@ -109,10 +109,10 @@ const makeWebSocketServer = Effect.fnUntraced(function*(payload: string, compres
 })
 
 describe("BunHttpServer", () => {
-  it.effect("rejects unresolved hostnames and reports Unix listeners", () =>
+  it.effect("resolves hostnames and reports Unix listeners", () =>
     Effect.gen(function*() {
-      const error = yield* BunHttpServer.make({ hostname: "localhost", port: 0 }).pipe(Effect.flip)
-      assert.strictEqual(error._tag, "ServeError")
+      const server = yield* BunHttpServer.make({ hostname: "localhost", port: 0 })
+      assert.isTrue(server.address._tag === "InetAddressV4" || server.address._tag === "InetAddressV6")
 
       const path = `${process.env.TMPDIR ?? "/tmp"}/effect-bun-${crypto.randomUUID()}.sock`
       const unixServer = yield* BunHttpServer.make({ unix: path })

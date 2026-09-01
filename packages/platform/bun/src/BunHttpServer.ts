@@ -28,6 +28,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import type * as Path from "effect/Path"
 import type * as Record from "effect/Record"
+import * as Result from "effect/Result"
 import * as Scheduler from "effect/Scheduler"
 import type * as Schema from "effect/Schema"
 import * as Scope from "effect/Scope"
@@ -57,11 +58,6 @@ import * as BunStream from "./BunStream.ts"
 
 /**
  * Bun serve options accepted by the HTTP server, extended with typed route definitions.
- *
- * **Gotchas**
- *
- * Internet listeners require a numeric IP literal in `hostname`. Hostnames that
- * require DNS resolution are rejected before the server starts.
  *
  * @category options
  * @since 4.0.0
@@ -121,11 +117,22 @@ export const make = Effect.fnUntraced(
     }
   ) {
     const scope = yield* Effect.scope
-    const requestedIp = "unix" in options
-      ? undefined
-      : yield* Effect.fromResult(NetAddress.ipFromString(
-        (options as Bun.Serve.HostnamePortServeOptions<WebSocketContext>).hostname ?? "0.0.0.0"
-      )).pipe(Effect.mapError((cause) => new Error.ServeError({ cause })))
+    let listenOptions = options
+    if (!("unix" in options)) {
+      const internetOptions = options as Bun.Serve.HostnamePortServeOptions<WebSocketContext>
+      const hostname = internetOptions.hostname ?? "0.0.0.0"
+      if (Result.isFailure(NetAddress.ipFromString(hostname))) {
+        const resolved = yield* Effect.tryPromise({
+          try: async () => {
+            const result = await Bun.dns.lookup(hostname, { socketType: "tcp" })
+            if (result.length === 0) throw new globalThis.Error(`Could not resolve hostname: ${hostname}`)
+            return result[0].address
+          },
+          catch: (cause) => new Error.ServeError({ cause })
+        })
+        listenOptions = { ...options, hostname: resolved }
+      }
+    }
     const { compressionThreshold = MIN_COMPRESSIBLE_SIZE, ...websocket } = options.websocket ?? {}
     const handlerStack: Array<(request: Request, server: BunServer<WebSocketContext>) => Response | Promise<Response>> =
       [
@@ -134,7 +141,7 @@ export const make = Effect.fnUntraced(
         }
       ]
     const server = Bun.serve<WebSocketContext, R>({
-      ...options as ServeOptions<R>,
+      ...listenOptions as ServeOptions<R>,
       fetch: handlerStack[0],
       websocket: {
         ...websocket,
@@ -167,7 +174,9 @@ export const make = Effect.fnUntraced(
 
     const address = "unix" in options
       ? NetAddress.unixPathAddress(options.unix)
-      : NetAddress.inetAddressUnsafe(requestedIp!, server.port!)
+      : yield* Effect.fromResult(NetAddress.inetAddressFromIpString(server.hostname!, server.port!)).pipe(
+        Effect.mapError((cause) => new Error.ServeError({ cause }))
+      )
 
     return Server.make({
       address,

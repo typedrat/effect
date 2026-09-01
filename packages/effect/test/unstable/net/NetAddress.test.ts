@@ -136,6 +136,14 @@ describe("NetAddress", () => {
         0,
         1
       ])
+      assert.strictEqual(
+        NetAddress.formatIp(NetAddress.ipv6FromBytesUnsafe(new Uint8Array(16))),
+        "::"
+      )
+      assert.strictEqual(
+        NetAddress.formatIp(NetAddress.ipv4FromBytesUnsafe(new Uint8Array([127, 0, 0, 1]))),
+        "127.0.0.1"
+      )
     })
   })
 
@@ -215,7 +223,7 @@ describe("NetAddress", () => {
     const ipv4 = success(NetAddress.ipv4FromString("127.0.0.1"))
     const ipv6 = success(NetAddress.ipv6FromString("::1"))
     const inet4 = success(NetAddress.inetAddressV4(ipv4, 80))
-    const inet6 = success(NetAddress.inetAddressV6(ipv6, 80, { flowInfo: 1, scopeId: 2 }))
+    const inet6 = success(NetAddress.inetAddressV6(ipv6, 80, { scopeId: 2 }))
     const mac = success(NetAddress.macAddressFromString("00:00:5e:00:53:01"))
     const unix = NetAddress.unixPathAddress("server.sock")
 
@@ -299,6 +307,8 @@ describe("NetAddress", () => {
           "127.0.0.1:-1",
           "127.0.0.1:65536",
           "127.0.0.1:1.5",
+          "127.0.0.1:00",
+          "127.0.0.1:080",
           "localhost:80",
           "::1:80",
           "[::1]80",
@@ -313,13 +323,17 @@ describe("NetAddress", () => {
       ) {
         failure(NetAddress.inetAddressFromString(input))
       }
+      const invalidPort = NetAddress.inetAddressFromString("127.0.0.1:65536")
+      if (Result.isSuccess(invalidPort)) assert.fail("expected Failure")
+      assert.strictEqual(invalidPort.failure.kind, "InetAddress")
+      assert.strictEqual(invalidPort.failure.input, "127.0.0.1:65536")
     })
 
-    it("preserves IPv6 flow and scope metadata in equality and hashing", () => {
+    it("preserves IPv6 scope metadata in equality and hashing", () => {
       const address = success(NetAddress.ipv6FromString("fe80::1"))
-      const first = success(NetAddress.inetAddressV6(address, 80, { flowInfo: 2, scopeId: 3 }))
-      const second = success(NetAddress.inetAddressV6(address, 80, { flowInfo: 2, scopeId: 3 }))
-      const otherScope = success(NetAddress.inetAddressV6(address, 80, { flowInfo: 2, scopeId: 4 }))
+      const first = success(NetAddress.inetAddressV6(address, 80, { scopeId: 3 }))
+      const second = success(NetAddress.inetAddressV6(address, 80, { scopeId: 3 }))
+      const otherScope = success(NetAddress.inetAddressV6(address, 80, { scopeId: 4 }))
       assert.isTrue(Equal.equals(first, second))
       assert.strictEqual(Hash.hash(first), Hash.hash(second))
       assert.isFalse(Equal.equals(first, otherScope))
@@ -329,7 +343,6 @@ describe("NetAddress", () => {
       const scoped = success(NetAddress.inetAddressFromString("[fe80::1%4294967295]:65535"))
       if (!NetAddress.isInetAddressV6(scoped)) assert.fail("expected InetAddressV6")
       assert.strictEqual(scoped.scopeId, 0xffffffff)
-      assert.strictEqual(scoped.flowInfo, 0)
       assert.strictEqual(NetAddress.formatInet(scoped), "[fe80::1%4294967295]:65535")
       assert.strictEqual(
         NetAddress.formatInet(success(NetAddress.inetAddressFromString("[fe80::1%0]:80"))),
@@ -346,6 +359,8 @@ describe("NetAddress", () => {
   })
 
   it("decodes and canonically encodes schemas", () => {
+    assert.strictEqual(Schema.resolveAnnotations(Schema.IpAddress)?.identifier, "IpAddress")
+    assert.strictEqual(Schema.resolveAnnotations(Schema.IpAddressFromString)?.identifier, "IpAddressFromString")
     const mac = Schema.decodeUnknownSync(Schema.MacAddressFromString)("02:0A:0b:0C:0d:0E")
     assert.strictEqual(Schema.encodeSync(Schema.MacAddressFromString)(mac), "02:0a:0b:0c:0d:0e")
     const ipv6 = Schema.decodeUnknownSync(Schema.Ipv6AddressFromString)("2001:0DB8:0:0:0:0:0:1")

@@ -657,125 +657,35 @@ const decodeNumeric = (bytes: Uint8Array, offset: number, size: number): string 
 const PGSQL_AF_INET = 2
 const PGSQL_AF_INET6 = 3
 
-const parseIPv4 = (text: string): Uint8Array | undefined => {
-  const parts = text.split(".")
-  if (parts.length !== 4) return undefined
-  const bytes = new Uint8Array(4)
-  for (let i = 0; i < 4; i++) {
-    if (!/^\d{1,3}$/.test(parts[i])) return undefined
-    const value = Number(parts[i])
-    if (value > 255) return undefined
-    bytes[i] = value
-  }
-  return bytes
-}
-
-const parseIPv6 = (text: string): Uint8Array | undefined => {
-  const halves = text.split("::")
-  if (halves.length > 2) return undefined
-  const toGroups = (part: string): Array<string> => part === "" ? [] : part.split(":")
-  const head = toGroups(halves[0])
-  const tail = halves.length === 2 ? toGroups(halves[1]) : []
-  const bytes = new Uint8Array(16)
-
-  const trailing = tail.length > 0 ? tail[tail.length - 1] : head.length > 0 ? head[head.length - 1] : ""
-  const embedded = trailing.includes(".") ? parseIPv4(trailing) : undefined
-  if (trailing.includes(".") && embedded === undefined) return undefined
-  if (embedded !== undefined) {
-    if (halves.length === 2 && tail.length === 0) return undefined
-    if (tail.length > 0) tail.pop()
-    else head.pop()
-  }
-  const groupCount = embedded === undefined ? 8 : 6
-  if (head.length + tail.length > groupCount) return undefined
-  if (halves.length === 1 && head.length !== groupCount) return undefined
-
-  const writeGroup = (group: string, offset: number): boolean => {
-    if (!/^[0-9a-fA-F]{1,4}$/.test(group)) return false
-    const value = Number.parseInt(group, 16)
-    bytes[offset] = value >> 8
-    bytes[offset + 1] = value & 0xff
-    return true
-  }
-  for (let i = 0; i < head.length; i++) {
-    if (!writeGroup(head[i], i * 2)) return undefined
-  }
-  for (let i = 0; i < tail.length; i++) {
-    if (!writeGroup(tail[i], (groupCount - tail.length + i) * 2)) return undefined
-  }
-  if (embedded !== undefined) bytes.set(embedded, 12)
-  return bytes
-}
-
-const formatIPv4 = (bytes: Uint8Array, offset: number): string =>
-  `${bytes[offset]}.${bytes[offset + 1]}.${bytes[offset + 2]}.${bytes[offset + 3]}`
-
-const formatIPv6 = (bytes: Uint8Array, offset: number): string => {
-  let isV4Mapped = bytes[offset + 10] === 0xff && bytes[offset + 11] === 0xff
-  for (let i = 0; isV4Mapped && i < 10; i++) isV4Mapped = bytes[offset + i] === 0
-  if (isV4Mapped) return `::ffff:${formatIPv4(bytes, offset + 12)}`
-
-  const groups: Array<number> = []
-  for (let i = 0; i < 8; i++) groups.push(readUint16(bytes, offset + i * 2))
-
-  let bestStart = -1
-  let bestLength = 0
-  let start = -1
-  for (let i = 0; i <= 8; i++) {
-    if (i < 8 && groups[i] === 0) {
-      if (start === -1) start = i
-    } else if (start !== -1) {
-      if (i - start > bestLength) {
-        bestStart = start
-        bestLength = i - start
-      }
-      start = -1
-    }
-  }
-  if (bestLength < 2) {
-    return groups.map((group) => group.toString(16)).join(":")
-  }
-  const head = groups.slice(0, bestStart).map((group) => group.toString(16)).join(":")
-  const tail = groups.slice(bestStart + bestLength).map((group) => group.toString(16)).join(":")
-  return `${head}::${tail}`
-}
-
 const encodeInet = (value: unknown, isCidr: boolean): Uint8Array => {
   const text = requireString(value, isCidr ? "cidr" : "inet")
+  const slash = text.indexOf("/")
+  if (slash !== text.lastIndexOf("/")) return fail(`Invalid network address "${text}"`)
+  const addressText = slash === -1 ? text : text.slice(0, slash)
+  const parsedAddress = NetAddress.ipFromString(addressText)
+  if (Result.isFailure(parsedAddress)) return fail(parsedAddress.failure.message)
+  const address = parsedAddress.success
+  const fullBits = NetAddress.isIpv4Address(address) ? 32 : 128
+  let bits = fullBits
+  if (slash !== -1) {
+    const prefix = text.slice(slash + 1)
+    if (!/^(0|[1-9]\d*)$/.test(prefix)) return fail(`Invalid netmask length in "${text}"`)
+    bits = Number(prefix)
+    if (bits > fullBits) return fail(`Invalid netmask length in "${text}"`)
+  }
   if (isCidr) {
-    const parsed = IpNetwork.fromString(text)
-    if (Result.isFailure(parsed)) return fail(parsed.failure.message)
-    const network = parsed.success
-    const address = network.address
-    const octets = NetAddress.isIpv4Address(address)
-      ? NetAddress.ipv4ToOctets(address)
-      : NetAddress.ipv6ToOctets(address)
-    const result = new Uint8Array(4 + octets.length)
-    result[0] = NetAddress.isIpv4Address(address) ? PGSQL_AF_INET : PGSQL_AF_INET6
-    result[1] = network.prefixLength
-    result[2] = 1
-    result[3] = octets.length
-    result.set(octets, 4)
-    return result
+    const network = IpNetwork.make(address, bits)
+    if (Result.isFailure(network)) return fail(network.failure.message)
   }
-  const slash = text.lastIndexOf("/")
-  const address = slash === -1 ? text : text.slice(0, slash)
-  const v4 = parseIPv4(address)
-  const bytes = v4 ?? parseIPv6(address)
-  if (bytes === undefined) {
-    return fail(`Expected an IP address, received "${text}"`)
-  }
-  const fullBits = bytes.length * 8
-  const bits = slash === -1 ? fullBits : Number(text.slice(slash + 1))
-  if (!Number.isInteger(bits) || bits < 0 || bits > fullBits) {
-    return fail(`Invalid netmask length in "${text}"`)
-  }
-  const result = new Uint8Array(4 + bytes.length)
-  result[0] = v4 === undefined ? PGSQL_AF_INET6 : PGSQL_AF_INET
+  const octets = NetAddress.isIpv4Address(address)
+    ? NetAddress.ipv4ToOctets(address)
+    : NetAddress.ipv6ToOctets(address)
+  const result = new Uint8Array(4 + octets.length)
+  result[0] = NetAddress.isIpv4Address(address) ? PGSQL_AF_INET : PGSQL_AF_INET6
   result[1] = bits
   result[2] = isCidr ? 1 : 0
-  result[3] = bytes.length
-  result.set(bytes, 4)
+  result[3] = octets.length
+  result.set(octets, 4)
   return result
 }
 
@@ -793,36 +703,16 @@ const decodeInet = (bytes: Uint8Array, offset: number, size: number): string => 
   }
   requireSize(size, 4 + addressSize, "inet")
   if (bits > addressSize * 8) return fail(`Invalid inet netmask length: ${bits}`)
+  const addressBytes = bytes.slice(offset + 4, offset + 4 + addressSize)
+  const address = family === PGSQL_AF_INET
+    ? NetAddress.ipv4FromBytesUnsafe(addressBytes)
+    : NetAddress.ipv6FromBytesUnsafe(addressBytes)
   if (isCidr) {
-    let address: NetAddress.IpAddress
-    if (family === PGSQL_AF_INET) {
-      const parsed = NetAddress.ipv4FromOctets(
-        bytes[offset + 4],
-        bytes[offset + 5],
-        bytes[offset + 6],
-        bytes[offset + 7]
-      )
-      if (Result.isFailure(parsed)) return fail(parsed.failure.message)
-      address = parsed.success
-    } else {
-      const parsed = NetAddress.ipv6FromSegments(
-        readUint16(bytes, offset + 4),
-        readUint16(bytes, offset + 6),
-        readUint16(bytes, offset + 8),
-        readUint16(bytes, offset + 10),
-        readUint16(bytes, offset + 12),
-        readUint16(bytes, offset + 14),
-        readUint16(bytes, offset + 16),
-        readUint16(bytes, offset + 18)
-      )
-      if (Result.isFailure(parsed)) return fail(parsed.failure.message)
-      address = parsed.success
-    }
     const network = IpNetwork.make(address, bits)
     if (Result.isFailure(network)) return fail(network.failure.message)
     return IpNetwork.format(network.success)
   }
-  const text = family === PGSQL_AF_INET ? formatIPv4(bytes, offset + 4) : formatIPv6(bytes, offset + 4)
+  const text = NetAddress.formatIp(address)
   return bits !== addressSize * 8 ? `${text}/${bits}` : text
 }
 

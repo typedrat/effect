@@ -18,6 +18,7 @@ import * as HttpRouter from "../http/HttpRouter.ts"
 import type * as HttpServer from "../http/HttpServer.ts"
 import type { HttpServerRequest } from "../http/HttpServerRequest.ts"
 import type { HttpServerResponse } from "../http/HttpServerResponse.ts"
+import * as NetAddress from "../net/NetAddress.ts"
 import * as RpcClient from "../rpc/RpcClient.ts"
 import * as RpcSerialization from "../rpc/RpcSerialization.ts"
 import * as RpcServer from "../rpc/RpcServer.ts"
@@ -30,8 +31,6 @@ import * as RunnerServer from "./RunnerServer.ts"
 import type { RunnerStorage } from "./RunnerStorage.ts"
 import * as Sharding from "./Sharding.ts"
 import type * as ShardingConfig from "./ShardingConfig.ts"
-
-const formatAuthorityHost = (host: string): string => host.includes(":") && !host.startsWith("[") ? `[${host}]` : host
 
 /**
  * Provides a runner RPC client protocol that connects to runner addresses over
@@ -64,7 +63,9 @@ export const layerClientProtocolHttp = (options: {
           const clientWithUrl = HttpClient.mapRequest(
             client,
             HttpClientRequest.prependUrl(
-              `http${https ? "s" : ""}://${formatAuthorityHost(address.host)}:${address.port}/${options.path}`
+              `http${https ? "s" : ""}://${
+                NetAddress.formatUrlHostString(address.host)
+              }:${address.port}/${options.path}`
             )
           )
           return RpcClient.makeProtocolHttp(clientWithUrl).pipe(
@@ -116,7 +117,7 @@ export const layerClientProtocolWebsocket = (options: {
         codecFor: serialization.codecFor,
         make: Effect.fnUntraced(function*(address) {
           const socket = yield* Socket.makeWebSocket(
-            `ws${https ? "s" : ""}://${formatAuthorityHost(address.host)}:${address.port}/${options.path}`
+            `ws${https ? "s" : ""}://${NetAddress.formatUrlHostString(address.host)}:${address.port}/${options.path}`
           ).pipe(
             Effect.provideService(Socket.WebSocketConstructor, constructor)
           )

@@ -287,6 +287,20 @@ describe("PgTypes", () => {
     assert.strictEqual(PgTypes.decode(expected, PgTypes.OID.cidr, 1), "2001:db8::/32")
   })
 
+  it("uses shared canonical parsing for inet and cidr", () => {
+    assert.deepStrictEqual(
+      PgTypes.encode("10.1.2.3", PgTypes.OID.cidr),
+      bytes("022001040a010203")
+    )
+    const inet = bytes("0380001020010db8000000000000000000000001")
+    assert.deepStrictEqual(
+      PgTypes.encode("2001:0DB8:0000:0000:0000:0000:0000:0001", PgTypes.OID.inet),
+      inet
+    )
+    assert.strictEqual(PgTypes.decode(inet, PgTypes.OID.inet, 1), "2001:db8::1")
+    assertThrowsTagged("PgTypesCodecError", () => PgTypes.encode("010.1.2.3", PgTypes.OID.inet))
+  })
+
   describe("errors", () => {
     it("rejects the text format", () => {
       assertThrowsTagged("PgTypesCodecError", () => PgTypes.decode(bytes("31"), PgTypes.OID.int4, 0))

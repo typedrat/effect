@@ -17,6 +17,9 @@ describe("NetAddress", () => {
       Result.Result<NetAddress.SocketAddress, NetAddress.NetAddressError>
     >()
     expect(NetAddress.socketAddressFromInputUnsafe({ path: "server.sock" })).type.toBe<NetAddress.SocketAddress>()
+    expect(NetAddress.ipv4FromBytesUnsafe(new Uint8Array(4))).type.toBe<NetAddress.Ipv4Address>()
+    expect(NetAddress.ipv6FromBytesUnsafe(new Uint8Array(16))).type.toBe<NetAddress.Ipv6Address>()
+    expect(NetAddress.ipv6ToOctets(NetAddress.ipv6Loopback)).type.toBe<ReadonlyArray<number>>()
     expect(NetAddress.ipv4Loopback.bytes).type.toBe<Uint8Array>()
   })
 

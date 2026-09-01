@@ -6,27 +6,27 @@ import { describe, expect, it } from "tstyche"
 describe("IpNetwork", () => {
   it("preserves address families in checked constructors", () => {
     expect(IpNetwork.make(NetAddress.ipv4Unspecified, 0)).type.toBe<
-      Result.Result<IpNetwork.Ipv4Network, IpNetwork.NetworkError>
+      Result.Result<IpNetwork.Ipv4Network, IpNetwork.IpNetworkError>
     >()
     expect(IpNetwork.make(NetAddress.ipv6Unspecified, 0)).type.toBe<
-      Result.Result<IpNetwork.Ipv6Network, IpNetwork.NetworkError>
+      Result.Result<IpNetwork.Ipv6Network, IpNetwork.IpNetworkError>
     >()
     expect(IpNetwork.fromAddress(NetAddress.ipv4Unspecified, 0)).type.toBe<
-      Result.Result<IpNetwork.Ipv4Network, IpNetwork.NetworkError>
+      Result.Result<IpNetwork.Ipv4Network, IpNetwork.IpNetworkError>
     >()
     const address = null as unknown as NetAddress.IpAddress
-    expect(IpNetwork.make(address, 0)).type.toBe<Result.Result<IpNetwork.IpNetwork, IpNetwork.NetworkError>>()
-    expect(IpNetwork.fromAddress(address, 0)).type.toBe<Result.Result<IpNetwork.IpNetwork, IpNetwork.NetworkError>>()
+    expect(IpNetwork.make(address, 0)).type.toBe<Result.Result<IpNetwork.IpNetwork, IpNetwork.IpNetworkError>>()
+    expect(IpNetwork.fromAddress(address, 0)).type.toBe<Result.Result<IpNetwork.IpNetwork, IpNetwork.IpNetworkError>>()
   })
 
   it("preserves families in parsers and unsafe constructors", () => {
     expect(IpNetwork.ipv4FromString("0.0.0.0/0")).type.toBe<
-      Result.Result<IpNetwork.Ipv4Network, IpNetwork.NetworkError>
+      Result.Result<IpNetwork.Ipv4Network, IpNetwork.IpNetworkError>
     >()
     expect(IpNetwork.ipv6FromString("::/0")).type.toBe<
-      Result.Result<IpNetwork.Ipv6Network, IpNetwork.NetworkError>
+      Result.Result<IpNetwork.Ipv6Network, IpNetwork.IpNetworkError>
     >()
-    expect(IpNetwork.fromString("::/0")).type.toBe<Result.Result<IpNetwork.IpNetwork, IpNetwork.NetworkError>>()
+    expect(IpNetwork.fromString("::/0")).type.toBe<Result.Result<IpNetwork.IpNetwork, IpNetwork.IpNetworkError>>()
     expect(IpNetwork.makeUnsafe(NetAddress.ipv4Unspecified, 0)).type.toBe<IpNetwork.Ipv4Network>()
     expect(IpNetwork.fromAddressUnsafe(NetAddress.ipv6Unspecified, 0)).type.toBe<IpNetwork.Ipv6Network>()
     expect(IpNetwork.fromStringUnsafe("::/0")).type.toBe<IpNetwork.IpNetwork>()

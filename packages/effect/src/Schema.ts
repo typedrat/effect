@@ -12058,7 +12058,8 @@ export interface Duration extends declare<Duration_.Duration> {
 const netAddressFromString = <A, E extends { readonly message: string }>(
   declaration: declare<A>,
   parse: (input: string) => Result_.Result<A, E>,
-  encode: (value: A) => string
+  encode: (value: A) => string,
+  identifier: string
 ) =>
   String.pipe(decodeTo(
     declaration,
@@ -12071,7 +12072,7 @@ const netAddressFromString = <A, E extends { readonly message: string }>(
       },
       encode: (value) => Effect.succeed(encode(value))
     })
-  ))
+  )).annotate({ identifier })
 
 /**
  * Schema for already-constructed MAC address values.
@@ -12079,7 +12080,9 @@ const netAddressFromString = <A, E extends { readonly message: string }>(
  * @category schemas
  * @since 4.0.0
  */
-export const MacAddress: declare<NetAddress_.MacAddress> = declare(NetAddress_.isMacAddress)
+export const MacAddress: declare<NetAddress_.MacAddress> = declare(NetAddress_.isMacAddress, {
+  identifier: "MacAddress"
+})
 
 /**
  * Schema for MAC addresses encoded as canonical colon-separated hexadecimal strings.
@@ -12090,7 +12093,8 @@ export const MacAddress: declare<NetAddress_.MacAddress> = declare(NetAddress_.i
 export const MacAddressFromString = netAddressFromString(
   MacAddress,
   NetAddress_.macAddressFromString,
-  NetAddress_.formatMacAddress
+  NetAddress_.formatMacAddress,
+  "MacAddressFromString"
 )
 
 /**
@@ -12099,7 +12103,9 @@ export const MacAddressFromString = netAddressFromString(
  * @category schemas
  * @since 4.0.0
  */
-export const Ipv4Address: declare<NetAddress_.Ipv4Address> = declare(NetAddress_.isIpv4Address)
+export const Ipv4Address: declare<NetAddress_.Ipv4Address> = declare(NetAddress_.isIpv4Address, {
+  identifier: "Ipv4Address"
+})
 
 /**
  * Schema for IPv4 addresses encoded as canonical dotted-decimal strings.
@@ -12110,7 +12116,8 @@ export const Ipv4Address: declare<NetAddress_.Ipv4Address> = declare(NetAddress_
 export const Ipv4AddressFromString = netAddressFromString(
   Ipv4Address,
   NetAddress_.ipv4FromString,
-  NetAddress_.formatIp
+  NetAddress_.formatIp,
+  "Ipv4AddressFromString"
 )
 
 /**
@@ -12119,7 +12126,9 @@ export const Ipv4AddressFromString = netAddressFromString(
  * @category schemas
  * @since 4.0.0
  */
-export const Ipv6Address: declare<NetAddress_.Ipv6Address> = declare(NetAddress_.isIpv6Address)
+export const Ipv6Address: declare<NetAddress_.Ipv6Address> = declare(NetAddress_.isIpv6Address, {
+  identifier: "Ipv6Address"
+})
 
 /**
  * Schema for IPv6 addresses encoded as canonical strings.
@@ -12130,7 +12139,8 @@ export const Ipv6Address: declare<NetAddress_.Ipv6Address> = declare(NetAddress_
 export const Ipv6AddressFromString = netAddressFromString(
   Ipv6Address,
   NetAddress_.ipv6FromString,
-  NetAddress_.formatIp
+  NetAddress_.formatIp,
+  "Ipv6AddressFromString"
 )
 
 /**
@@ -12139,7 +12149,9 @@ export const Ipv6AddressFromString = netAddressFromString(
  * @category schemas
  * @since 4.0.0
  */
-export const IpAddress: declare<NetAddress_.IpAddress> = declare(NetAddress_.isIpAddress)
+export const IpAddress: declare<NetAddress_.IpAddress> = declare(NetAddress_.isIpAddress, {
+  identifier: "IpAddress"
+})
 
 /**
  * Schema for IP addresses encoded as canonical numeric strings.
@@ -12150,7 +12162,8 @@ export const IpAddress: declare<NetAddress_.IpAddress> = declare(NetAddress_.isI
 export const IpAddressFromString = netAddressFromString(
   IpAddress,
   NetAddress_.ipFromString,
-  NetAddress_.formatIp
+  NetAddress_.formatIp,
+  "IpAddressFromString"
 )
 
 /**
@@ -12159,7 +12172,9 @@ export const IpAddressFromString = netAddressFromString(
  * @category schemas
  * @since 4.0.0
  */
-export const Ipv4Network: declare<IpNetwork_.Ipv4Network> = declare(IpNetwork_.isIpv4Network)
+export const Ipv4Network: declare<IpNetwork_.Ipv4Network> = declare(IpNetwork_.isIpv4Network, {
+  identifier: "Ipv4Network"
+})
 
 /**
  * Schema for canonical IPv4 network prefixes encoded in CIDR notation.
@@ -12170,7 +12185,8 @@ export const Ipv4Network: declare<IpNetwork_.Ipv4Network> = declare(IpNetwork_.i
 export const Ipv4NetworkFromString = netAddressFromString(
   Ipv4Network,
   IpNetwork_.ipv4FromString,
-  IpNetwork_.format
+  IpNetwork_.format,
+  "Ipv4NetworkFromString"
 )
 
 /**
@@ -12179,7 +12195,9 @@ export const Ipv4NetworkFromString = netAddressFromString(
  * @category schemas
  * @since 4.0.0
  */
-export const Ipv6Network: declare<IpNetwork_.Ipv6Network> = declare(IpNetwork_.isIpv6Network)
+export const Ipv6Network: declare<IpNetwork_.Ipv6Network> = declare(IpNetwork_.isIpv6Network, {
+  identifier: "Ipv6Network"
+})
 
 /**
  * Schema for canonical IPv6 network prefixes encoded in CIDR notation.
@@ -12190,7 +12208,8 @@ export const Ipv6Network: declare<IpNetwork_.Ipv6Network> = declare(IpNetwork_.i
 export const Ipv6NetworkFromString = netAddressFromString(
   Ipv6Network,
   IpNetwork_.ipv6FromString,
-  IpNetwork_.format
+  IpNetwork_.format,
+  "Ipv6NetworkFromString"
 )
 
 /**
@@ -12199,7 +12218,9 @@ export const Ipv6NetworkFromString = netAddressFromString(
  * @category schemas
  * @since 4.0.0
  */
-export const IpNetwork: declare<IpNetwork_.IpNetwork> = declare(IpNetwork_.isIpNetwork)
+export const IpNetwork: declare<IpNetwork_.IpNetwork> = declare(IpNetwork_.isIpNetwork, {
+  identifier: "IpNetwork"
+})
 
 /**
  * Schema for canonical IPv4 or IPv6 network prefixes encoded in CIDR notation.
@@ -12207,7 +12228,12 @@ export const IpNetwork: declare<IpNetwork_.IpNetwork> = declare(IpNetwork_.isIpN
  * @category schemas
  * @since 4.0.0
  */
-export const IpNetworkFromString = netAddressFromString(IpNetwork, IpNetwork_.fromString, IpNetwork_.format)
+export const IpNetworkFromString = netAddressFromString(
+  IpNetwork,
+  IpNetwork_.fromString,
+  IpNetwork_.format,
+  "IpNetworkFromString"
+)
 
 /**
  * Schema for already-constructed resolved IPv4 internet addresses.
@@ -12215,7 +12241,9 @@ export const IpNetworkFromString = netAddressFromString(IpNetwork, IpNetwork_.fr
  * @category schemas
  * @since 4.0.0
  */
-export const InetAddressV4: declare<NetAddress_.InetAddressV4> = declare(NetAddress_.isInetAddressV4)
+export const InetAddressV4: declare<NetAddress_.InetAddressV4> = declare(NetAddress_.isInetAddressV4, {
+  identifier: "InetAddressV4"
+})
 
 /**
  * Schema for already-constructed resolved IPv6 internet addresses.
@@ -12223,7 +12251,9 @@ export const InetAddressV4: declare<NetAddress_.InetAddressV4> = declare(NetAddr
  * @category schemas
  * @since 4.0.0
  */
-export const InetAddressV6: declare<NetAddress_.InetAddressV6> = declare(NetAddress_.isInetAddressV6)
+export const InetAddressV6: declare<NetAddress_.InetAddressV6> = declare(NetAddress_.isInetAddressV6, {
+  identifier: "InetAddressV6"
+})
 
 /**
  * Schema for already-constructed resolved internet addresses.
@@ -12231,15 +12261,12 @@ export const InetAddressV6: declare<NetAddress_.InetAddressV6> = declare(NetAddr
  * @category schemas
  * @since 4.0.0
  */
-export const InetAddress: declare<NetAddress_.InetAddress> = declare(NetAddress_.isInetAddress)
+export const InetAddress: declare<NetAddress_.InetAddress> = declare(NetAddress_.isInetAddress, {
+  identifier: "InetAddress"
+})
 
 /**
  * Schema for resolved internet addresses encoded as numeric socket strings.
- *
- * **Gotchas**
- *
- * Numeric socket strings do not carry IPv6 flow metadata. Use the
- * {@link InetAddress} declaration schema when that metadata must be retained.
  *
  * @category schemas
  * @since 4.0.0
@@ -12247,7 +12274,8 @@ export const InetAddress: declare<NetAddress_.InetAddress> = declare(NetAddress_
 export const InetAddressFromString = netAddressFromString(
   InetAddress,
   NetAddress_.inetAddressFromString,
-  NetAddress_.formatInet
+  NetAddress_.formatInet,
+  "InetAddressFromString"
 )
 
 /**
@@ -12257,7 +12285,8 @@ export const InetAddressFromString = netAddressFromString(
  * @since 4.0.0
  */
 export const UnixPathAddress: declare<NetAddress_.UnixPathAddress> = declare(
-  NetAddress_.isUnixPathAddress
+  NetAddress_.isUnixPathAddress,
+  { identifier: "UnixPathAddress" }
 )
 
 /**
@@ -12272,7 +12301,7 @@ export const UnixPathAddressFromString = String.pipe(decodeTo(
     decode: NetAddress_.unixPathAddress,
     encode: (address) => address.path
   })
-))
+)).annotate({ identifier: "UnixPathAddressFromString" })
 
 /**
  * Schema for already-constructed portable concrete socket addresses.
@@ -12280,7 +12309,9 @@ export const UnixPathAddressFromString = String.pipe(decodeTo(
  * @category schemas
  * @since 4.0.0
  */
-export const SocketAddress: declare<NetAddress_.SocketAddress> = declare(NetAddress_.isSocketAddress)
+export const SocketAddress: declare<NetAddress_.SocketAddress> = declare(NetAddress_.isSocketAddress, {
+  identifier: "SocketAddress"
+})
 
 /**
  * Schema for `Duration` values.

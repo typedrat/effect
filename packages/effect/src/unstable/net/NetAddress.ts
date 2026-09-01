@@ -76,7 +76,7 @@ export interface InetAddressV4 extends Equal.Equal, Hash.Hash {
 }
 
 /**
- * A resolved IPv6 internet address, port, flow information, and scope identifier.
+ * A resolved IPv6 internet address, port, and scope identifier.
  *
  * @category models
  * @since 4.0.0
@@ -85,7 +85,6 @@ export interface InetAddressV6 extends Equal.Equal, Hash.Hash {
   readonly _tag: "InetAddressV6"
   readonly address: Ipv6Address
   readonly port: number
-  readonly flowInfo: number
   readonly scopeId: number
   readonly [TypeId]: typeof TypeId
   toString(): string
@@ -302,9 +301,7 @@ const bytesEqual = (self: Uint8Array, that: Uint8Array): boolean => {
 }
 
 const hashBytes = (tag: string, bytes: Uint8Array): number => {
-  let hash = Hash.string(tag)
-  for (const byte of bytes) hash = Hash.combine(hash, Hash.number(byte))
-  return hash
+  return Hash.combine(Hash.string(tag), Hash.array(bytes))
 }
 
 const makeIpv4 = (bytes: Uint8Array): Ipv4Address => {
@@ -321,6 +318,22 @@ const makeMac = (bytes: Uint8Array): MacAddress => {
   const self = Object.assign(Object.create(MacProto), { bytes })
   return Object.freeze(self)
 }
+
+/**
+ * Creates an IPv4 address from trusted network-order bytes without validation.
+ *
+ * @category unsafe
+ * @since 4.0.0
+ */
+export const ipv4FromBytesUnsafe = (bytes: Uint8Array): Ipv4Address => makeIpv4(bytes)
+
+/**
+ * Creates an IPv6 address from trusted network-order bytes without validation.
+ *
+ * @category unsafe
+ * @since 4.0.0
+ */
+export const ipv6FromBytesUnsafe = (bytes: Uint8Array): Ipv6Address => makeIpv6(bytes)
 
 /**
  * The IPv4 loopback address `127.0.0.1`.
@@ -601,26 +614,7 @@ export const ipv6ToSegments = (
  */
 export const ipv6ToOctets = (
   self: Ipv6Address
-): readonly [
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number
-] => {
-  return Array.from(self.bytes) as any
-}
+): ReadonlyArray<number> => Array.from(self.bytes)
 
 /**
  * Returns the six numeric octets of a MAC address in a fresh tuple.
@@ -713,10 +707,7 @@ export const match: {
 export const formatIp = (self: IpAddress): string => {
   if (isIpv4Address(self)) return ipv4ToOctets(self).join(".")
   const segments = ipv6ToSegments(self)
-  if (
-    segments[0] === 0 && segments[1] === 0 && segments[2] === 0 && segments[3] === 0 && segments[4] === 0 &&
-    segments[5] === 0xffff
-  ) {
+  if (isIpv4Mapped(self)) {
     return `::ffff:${segments[6] >> 8}.${segments[6] & 0xff}.${segments[7] >> 8}.${segments[7] & 0xff}`
   }
   let bestStart = -1
@@ -745,10 +736,7 @@ export const formatIp = (self: IpAddress): string => {
  * @category predicates
  * @since 4.0.0
  */
-export const isUnspecified = (self: IpAddress): boolean => {
-  const bytes = isIpv4Address(self) ? self.bytes : self.bytes
-  return bytes.every((byte) => byte === 0)
-}
+export const isUnspecified = (self: IpAddress): boolean => self.bytes.every((byte) => byte === 0)
 
 /**
  * Returns `true` for IPv4 `127.0.0.0/8` or IPv6 `::1`.
@@ -863,9 +851,7 @@ export const fromIpv4Mapped = (self: Ipv6Address): Option.Option<Ipv4Address> =>
  * @since 4.0.0
  */
 export const toCanonical = (self: IpAddress): IpAddress =>
-  isIpv6Address(self) && isIpv4Mapped(self)
-    ? makeIpv4(self.bytes.slice(12))
-    : self
+  isIpv6Address(self) ? Option.getOrElse(fromIpv4Mapped(self), () => self) : self
 
 const InetV4Proto = {
   _tag: "InetAddressV4",
@@ -888,13 +874,14 @@ const InetV6Proto = {
   _tag: "InetAddressV6",
   [TypeId]: TypeId,
   [Equal.symbol](this: InetAddressV6, that: Equal.Equal): boolean {
-    return isInetAddressV6(that) && this.port === that.port && this.flowInfo === that.flowInfo &&
-      this.scopeId === that.scopeId && Equal.equals(this.address, that.address)
+    return isInetAddressV6(that) && this.port === that.port && this.scopeId === that.scopeId &&
+      Equal.equals(this.address, that.address)
   },
   [Hash.symbol](this: InetAddressV6): number {
     return Hash.combine(
-      Hash.combine(Hash.combine(Hash.hash(this.address))(Hash.number(this.port)))(Hash.number(this.flowInfo))
-    )(Hash.number(this.scopeId))
+      Hash.combine(Hash.hash(this.address), Hash.number(this.port)),
+      Hash.number(this.scopeId)
+    )
   },
   toString(this: InetAddressV6): string {
     return formatInet(this)
@@ -925,7 +912,7 @@ export const inetAddressV4 = (address: Ipv4Address, port: number): Result.Result
 }
 
 /**
- * Creates a checked IPv6 internet address with optional flow and scope metadata.
+ * Creates a checked IPv6 internet address with an optional scope identifier.
  *
  * @category constructors
  * @since 4.0.0
@@ -933,22 +920,17 @@ export const inetAddressV4 = (address: Ipv4Address, port: number): Result.Result
 export const inetAddressV6 = (
   address: Ipv6Address,
   port: number,
-  options?: { readonly flowInfo?: number | undefined; readonly scopeId?: number | undefined }
+  options?: { readonly scopeId?: number | undefined }
 ): Result.Result<InetAddressV6, NetAddressError> => {
   const checked = checkPort(port)
   if (Result.isFailure(checked)) return Result.fail(checked.failure)
-  const flowInfo = options?.flowInfo ?? 0
   const scopeId = options?.scopeId ?? 0
-  if (
-    !Number.isInteger(flowInfo) || flowInfo < 0 || flowInfo > 0xffffffff || !Number.isInteger(scopeId) || scopeId < 0 ||
-    scopeId > 0xffffffff
-  ) {
-    return addressError("InetAddress", options, "flowInfo and scopeId must be unsigned 32-bit integers")
+  if (!Number.isInteger(scopeId) || scopeId < 0 || scopeId > 0xffffffff) {
+    return addressError("InetAddress", options, "scopeId must be an unsigned 32-bit integer")
   }
   const self = Object.create(InetV6Proto)
   self.address = address
   self.port = port
-  self.flowInfo = flowInfo
   self.scopeId = scopeId
   return Result.succeed(Object.freeze(self))
 }
@@ -1042,15 +1024,18 @@ export const inetAddressFromString = (input: string): Result.Result<InetAddress,
     host = input.slice(0, separator)
     portText = input.slice(separator + 1)
   }
-  if (!/^\d+$/.test(portText)) return addressError("InetAddress", input, "port must be decimal")
+  if (!/^(0|[1-9]\d*)$/.test(portText)) {
+    return addressError("InetAddress", input, "port must be an unpadded decimal integer")
+  }
   const parsedIp = ipFromString(host)
   if (Result.isFailure(parsedIp)) return addressError("InetAddress", input, parsedIp.failure.reason)
   if (bracketed !== isIpv6Address(parsedIp.success)) {
     return addressError("InetAddress", input, "only IPv6 addresses use brackets")
   }
-  return isIpv6Address(parsedIp.success)
+  const address: Result.Result<InetAddress, NetAddressError> = isIpv6Address(parsedIp.success)
     ? inetAddressV6(parsedIp.success, Number(portText), { scopeId })
     : inetAddressV4(parsedIp.success, Number(portText))
+  return Result.isFailure(address) ? addressError("InetAddress", input, address.failure.reason) : address
 }
 
 /**
@@ -1081,6 +1066,15 @@ export const formatInet = (self: InetAddress): string => {
  * @since 4.0.0
  */
 export const formatUrlHost = (self: IpAddress): string => isIpv4Address(self) ? formatIp(self) : `[${formatIp(self)}]`
+
+/**
+ * Formats a hostname or numeric IP address for use as a URL authority host.
+ *
+ * @category encoding
+ * @since 4.0.0
+ */
+export const formatUrlHostString = (host: string): string =>
+  host.includes(":") && !host.startsWith("[") ? `[${host}]` : host
 
 const UnixPathProto = {
   _tag: "UnixPathAddress",
